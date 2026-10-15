@@ -199,7 +199,36 @@ func Build(t Trip, src HotspotSource, taxa []taxonomy.Taxon) Result {
 			first = last + 1
 		}
 	}
+
+	// A single unsplit day quiz already holds every species, so a combined copy would be a duplicate.
+	if all := allSpeciesQuiz(t, days); len(result.Quizzes) > 1 && len(all.Species) > 0 {
+		name := fmt.Sprintf("All days with species 1-%d.json", len(all.Species))
+		result.Quizzes = append(result.Quizzes, DayQuiz{Day: "All", FileName: uniqueName(name, used), Quiz: all})
+	}
 	return result
+}
+
+// allSpeciesQuiz combines every day's species into one taxonomically sorted quiz. It is left
+// unsplit on purpose: it is meant for reviewing the whole trip at once.
+func allSpeciesQuiz(t Trip, days [][]quiz.Species) quiz.Quiz {
+	var species []quiz.Species
+	for _, d := range days {
+		species = append(species, d...)
+	}
+	species = quiz.DedupeByName(species)
+	sort.SliceStable(species, func(a, b int) bool { return species[a].TaxonOrder < species[b].TaxonOrder })
+
+	notes := "All species for the trip"
+	if name := strings.TrimSpace(t.Name); name != "" {
+		notes = "All species for " + name
+	}
+	return quiz.Quiz{
+		StartMonth: orDefault(t.StartMonth, 1),
+		EndMonth:   orDefault(t.EndMonth, 12),
+		Location:   t.Location,
+		Notes:      notes,
+		Species:    species,
+	}
 }
 
 func orDefault(v, d int) int {
@@ -409,20 +438,4 @@ func without(species []quiz.Species, drop map[string]bool) []quiz.Species {
 		}
 	}
 	return kept
-}
-
-// WriteAll saves every quiz into dir, creating it if needed, and returns the file paths.
-func WriteAll(dir string, quizzes []DayQuiz) ([]string, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, fmt.Errorf("create output folder: %w", err)
-	}
-	paths := make([]string, 0, len(quizzes))
-	for _, q := range quizzes {
-		path := filepath.Join(dir, q.FileName)
-		if err := quiz.Write(path, q.Quiz); err != nil {
-			return paths, err
-		}
-		paths = append(paths, path)
-	}
-	return paths, nil
 }

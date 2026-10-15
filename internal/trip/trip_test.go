@@ -236,7 +236,7 @@ func TestLargeDayIsSplitIntoNamedParts(t *testing.T) {
 	tr := Trip{Itinerary: []Day{{Day: "1", Hotspots: []Hotspot{{HotspotID: "L1"}}}}}
 	res := Build(tr, mapSource{"L1": rows}, taxa)
 
-	if len(res.Quizzes) != 2 {
+	if len(res.Quizzes) != 3 {
 		t.Fatalf("quizzes = %d", len(res.Quizzes))
 	}
 	if res.Quizzes[0].FileName != "Day 1 with species 1-23.json" || res.Quizzes[1].FileName != "Day 1 with species 24-45.json" {
@@ -244,5 +244,75 @@ func TestLargeDayIsSplitIntoNamedParts(t *testing.T) {
 	}
 	if n := len(res.Quizzes[0].Quiz.Species) + len(res.Quizzes[1].Quiz.Species); n != 45 {
 		t.Errorf("species total = %d", n)
+	}
+}
+
+func TestAllSpeciesQuizCombinesEveryDayUnsplit(t *testing.T) {
+	var taxa []taxonomy.Taxon
+	var day1, day2 []HotspotSpecies
+	for i := 0; i < 90; i++ {
+		name := fmt.Sprintf("Bird %02d", i)
+		taxa = append(taxa, taxonomy.Taxon{CommonName: name, Category: "species", TaxonOrder: float64(i)})
+		row := HotspotSpecies{CommonName: name, Frequency: 50}
+		if i%2 == 0 {
+			day1 = append(day1, row)
+		} else {
+			day2 = append(day2, row)
+		}
+	}
+	tr := Trip{Name: "Big Trip", Location: "NO", StartMonth: 5, EndMonth: 6, Itinerary: []Day{
+		{Day: "1", Hotspots: []Hotspot{{HotspotID: "L1"}}},
+		{Day: "2", Hotspots: []Hotspot{{HotspotID: "L2"}}},
+	}}
+	res := Build(tr, mapSource{"L1": day1, "L2": day2}, taxa)
+
+	all := res.Quizzes[len(res.Quizzes)-1]
+	if all.FileName != "All days with species 1-90.json" || all.Day != "All" {
+		t.Fatalf("all quiz = %q day %q", all.FileName, all.Day)
+	}
+	if n := len(all.Quiz.Species); n != 90 {
+		t.Fatalf("all species = %d, want 90 in a single unsplit file", n)
+	}
+	for i, s := range all.Quiz.Species {
+		if s.TaxonOrder != float64(i) {
+			t.Fatalf("species %d out of taxonomic order: %v", i, s.TaxonOrder)
+		}
+	}
+	if all.Quiz.Notes != "All species for Big Trip" || all.Quiz.Location != "NO" || all.Quiz.StartMonth != 5 || all.Quiz.EndMonth != 6 {
+		t.Errorf("header = %+v", all.Quiz)
+	}
+	// Each day was split in parts (45 > 40) and the combined quiz is not.
+	for _, q := range res.Quizzes[:len(res.Quizzes)-1] {
+		if len(q.Quiz.Species) > maxPartSize {
+			t.Errorf("%s has %d species", q.FileName, len(q.Quiz.Species))
+		}
+	}
+}
+
+func TestAllSpeciesQuizSkippedWhenNoSpecies(t *testing.T) {
+	res := Build(Trip{Itinerary: []Day{{Day: "1"}}}, mapSource{}, testTaxa)
+	if len(res.Quizzes) != 1 || res.Quizzes[0].Day == "All" {
+		t.Fatalf("quizzes = %+v", res.Quizzes)
+	}
+}
+
+func TestAllSpeciesQuizUsesSharedSpeciesOnce(t *testing.T) {
+	src := mapSource{"L1": {{"Alpha Bird", 30}}, "L2": {{"Alpha Bird", 60}, {"Beta Bird", 20}}}
+	tr := Trip{Itinerary: []Day{{Day: "1", Hotspots: []Hotspot{{HotspotID: "L1"}}}, {Day: "2", Hotspots: []Hotspot{{HotspotID: "L2"}}}}}
+	res := Build(tr, src, testTaxa)
+	all := res.Quizzes[len(res.Quizzes)-1].Quiz
+	if !equal(names(all.Species), []string{"Alpha Bird", "Beta Bird"}) || *all.Species[0].Frequency != 60 {
+		t.Fatalf("all = %v", names(all.Species))
+	}
+	if all.Notes != "All species for the trip" {
+		t.Errorf("notes = %q", all.Notes)
+	}
+}
+
+func TestAllSpeciesQuizSkippedForSingleUnsplitDay(t *testing.T) {
+	tr := Trip{Itinerary: []Day{{Day: "1", Hotspots: []Hotspot{{HotspotID: "L1"}}}}}
+	res := Build(tr, mapSource{"L1": {{"Alpha Bird", 50}}}, testTaxa)
+	if len(res.Quizzes) != 1 || res.Quizzes[0].Day == "All" {
+		t.Fatalf("quizzes = %+v", res.Quizzes)
 	}
 }

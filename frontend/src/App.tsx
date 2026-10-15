@@ -1,7 +1,9 @@
 import {useEffect, useState} from 'react'
 import grackleAvatar from './assets/images/grackle-avatar.jpg'
 import {
+    ChooseQuizzesFolder,
     ChooseTripFile,
+    GetSettings,
     PreviewTrip,
     WriteTripQuizzes,
 } from '../wailsjs/go/main/App'
@@ -20,20 +22,32 @@ export default function App() {
     const [tripPath, setTripPath] = useState('')
     const [preview, setPreview] = useState<main.TripPreview | null>(null)
     const [written, setWritten] = useState<string[] | null>(null)
+    const [cancelled, setCancelled] = useState(false)
+    const [folder, setFolder] = useState<main.SettingsView | null>(null)
     const [error, setError] = useState('')
     const [busy, setBusy] = useState(false)
     const [open, setOpen] = useState<number | null>(null)
     const [progress, setProgress] = useState('')
 
     useEffect(() => EventsOn('hotspot-progress', (message: string) => setProgress(message)), [])
+    useEffect(() => {
+        GetSettings().then(setFolder)
+    }, [])
 
     const request = () => main.TripRequest.createFrom({tripPath})
 
     function reset() {
         setPreview(null)
         setWritten(null)
+        setCancelled(false)
         setError('')
         setOpen(null)
+    }
+
+    async function pickFolder() {
+        const updated = await ChooseQuizzesFolder()
+        setFolder(updated)
+        reset()
     }
 
     async function pickTrip() {
@@ -58,6 +72,7 @@ export default function App() {
 
     async function onPreview() {
         setWritten(null)
+        setCancelled(false)
         const result = await run(() => PreviewTrip(request()))
         if (result) {
             setPreview(result)
@@ -66,8 +81,12 @@ export default function App() {
     }
 
     async function onWrite() {
-        const paths = await run(() => WriteTripQuizzes(request()))
-        if (paths) setWritten(paths)
+        setWritten(null)
+        setCancelled(false)
+        const result = await run(() => WriteTripQuizzes(request()))
+        if (!result) return
+        if (result.cancelled) setCancelled(true)
+        else setWritten(result.written)
     }
 
     const ready = tripPath !== ''
@@ -87,7 +106,7 @@ export default function App() {
                 <p className="eyebrow">TRIP TO QUIZZES</p>
                 <h1>Build daily quizzes from a trip</h1>
                 <p className="intro">
-                    Choose a trip itinerary and the folder of hotspot species data. The builder averages
+                    Choose a trip itinerary. The builder downloads hotspot data from eBird, averages
                     frequencies, adds species named in the itinerary, sorts them taxonomically, and writes one
                     quiz file per day for the Photo ID runner.
                 </p>
@@ -109,9 +128,18 @@ export default function App() {
                         <span/>
                     </div>
                     <div className="step-row">
-                        <span className="step-label">3. OUTPUT FOLDER</span>
-                        <span className="step-value">Fixed for now: build/temp in this project</span>
-                        <span/>
+                        <span className="step-label">3. QUIZZES FOLDER</span>
+                        <span className="step-value" title={folder?.quizzesDir}>
+                            {folder?.quizzesDir ?? ''}
+                            <span className="step-hint">
+                                {folder?.quizzesDirFromEnv
+                                    ? 'Set by the PHOTO_ID_QUIZZES_DIR environment variable. '
+                                    : ''}
+                                Each trip gets its own folder here, named after the trip.
+                            </span>
+                        </span>
+                        <button className="secondary-button" onClick={pickFolder}
+                                disabled={busy || folder?.quizzesDirFromEnv}>Choose…</button>
                     </div>
                 </div>
 
@@ -128,6 +156,11 @@ export default function App() {
 
                 {busy && progress && <div className="message notice" role="status">{progress}</div>}
                 {error && <div className="message error" role="alert">{error}</div>}
+                {cancelled && (
+                    <div className="message notice" role="status">
+                        Cancelled. Existing quizzes were left as they were.
+                    </div>
+                )}
                 {written && (
                     <div className="message success" role="status">
                         Wrote {written.length} quiz files to {preview?.outputDir}. Open them in the runner.
