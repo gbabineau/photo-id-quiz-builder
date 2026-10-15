@@ -1,0 +1,57 @@
+.app-shell { min-height: 100vh; background: #f1f4ef; }
+.topbar { height: 68px; display: flex; align-items: center; gap: 28px; padding: 0 5.5vw; color: #f6f7ef; background: #183f35; }
+.brand-lockup { display: flex; align-items: center; gap: 11px; }
+.brand-mark { display: block; width: 30px; height: 30px; flex: 0 0 30px; overflow: hidden; border: 1px solid #94b76b; }
+.brand-mark img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.brand-name, .topbar-label, .eyebrow, .section-label, .step-label, .summary-label { font-size: 10px; font-weight: 800; letter-spacing: 1.2px; }
+.brand-name { font-size: 12px; }
+.topbar-label { color: #b4c9b0; }
+.primary-button { min-height: 40px; padding: 0 18px; border: 0; border-radius: 3px; color: #f8f8f1; background: #26634d; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; }
+.primary-button:hover:not(:disabled) { background: #2f7860; }
+.accent-button { min-height: 40px; padding: 0 18px; border: 0; border-radius: 3px; color: #17392f; background: #d4e478; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; }
+.accent-button:hover:not(:disabled) { background: #e2ed9b; }
+.primary-button:disabled, .accent-button:disabled { cursor: default; opacity: 0.55; }
+.secondary-button { min-height: 36px; padding: 0 12px; border: 1px solid #b9c8bb; border-radius: 3px; color: #315344; background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
+.secondary-button:hover { background: #e4eae1; }
+.main-content { width: min(1040px, 89vw); margin: 0 auto; padding: 48px 0 72px; }
+.eyebrow, .section-label, .step-label { margin: 0; color: #59776a; }
+h1, h2, p { margin-top: 0; }
+h1 { margin: 8px 0 12px; color: #1d342c; font-family: Georgia, 'Times New Roman', serif; font-size: 42px; font-weight: 500; line-height: 1.08; }
+h2 { margin: 5px 0 0; color: #20372e; font-family: Georgia, 'Times New Roman', serif; font-size: 26px; font-weight: 500; }
+.intro { max-width: 620px; margin-bottom: 28px; color: #62736a; font-size: 15px; line-height: 1.7; }
+.steps { margin: 0; border-top: 1px solid #cdd6cb; }
+.step-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; align-items: center; gap: 16px; min-height: 76px; border-bottom: 1px solid #cdd6cb; }
+.step-value { min-width: 0; overflow: hidden; color: #243b31; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.step-value.placeholder { color: #8a988e; }
+.step-hint { display: block; margin-top: 3px; color: #718075; font-size: 11px; white-space: normal; }
+.actions { display: flex; align-items: center; gap: 12px; margin-top: 24px; }
+.message { margin: 22px 0 0; padding: 12px 14px; font-size: 13px; }
+.message.error { border-left: 3px solid #bd4a36; color: #742f26; background: #fae8e2; }
+.message.notice { border-left: 3px solid #9cae6c; color: #52665a; background: #e5ebdf; }
+.message.success { border-left: 3px solid #26634d; color: #1d4a3a; background: #e1efe0; }
+.message ul { margin: 6px 0 0; padding-left: 18px; }
+.results { margin-top: 40px; }
+.results-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.output-path { color: #708276; font-size: 12px; word-break: break-all; }
+.day-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid #cdd6cb; }
+.day-item { border-bottom: 1px solid #cdd6cb; }
+.day-toggle { display: grid; grid-template-columns: 64px minmax(0, 1fr) 110px; align-items: center; gap: 14px; width: 100%; min-height: 64px; padding: 0; border: 0; color: inherit; background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.day-toggle:hover { background: #e9eee6; }
+.day-number { color: #829581; font-family: Georgia, serif; font-size: 18px; }
+.day-title { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.day-title strong { font-size: 14px; }
+.day-title span { color: #718075; font-size: 12px; }
+.day-count { color: #28644e; font-size: 12px; font-weight: 800; text-align: right; }
+.species-table { margin: 0 0 16px 78px; padding: 0; list-style: none; columns: 2; column-gap: 28px; font-size: 13px; }
+.species-table li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px dotted #cdd6cb; break-inside: avoid; }
+.species-table .freq { color: #718075; font-size: 11px; }
+.species-table .mentioned { color: #789650; font-size: 11px; }
+@media (max-width: 760px) {
+    .topbar { padding: 0 20px; }
+    .topbar-label { display: none; }
+    .main-content { width: calc(100% - 40px); padding-top: 32px; }
+    h1 { font-size: 34px; }
+    .step-row { grid-template-columns: 1fr auto; padding: 10px 0; }
+    .step-label { grid-column: 1 / span 2; }
+    .species-table { margin-left: 0; columns: 1; }
+}
