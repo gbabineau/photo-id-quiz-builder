@@ -1,13 +1,12 @@
-import {useState} from 'react'
+import {useEffect, useState} from 'react'
 import grackleAvatar from './assets/images/grackle-avatar.jpg'
 import {
-    ChooseFolder,
     ChooseTripFile,
-    DefaultOutputDir,
     PreviewTrip,
     WriteTripQuizzes,
 } from '../wailsjs/go/main/App'
 import {main} from '../wailsjs/go/models'
+import {EventsOn} from '../wailsjs/runtime/runtime'
 
 function fileName(path: string): string {
     return path.split(/[\\/]/).pop() ?? path
@@ -19,16 +18,16 @@ function errorText(err: unknown): string {
 
 export default function App() {
     const [tripPath, setTripPath] = useState('')
-    const [hotspotDir, setHotspotDir] = useState('')
-    const [outputDir, setOutputDir] = useState('')
     const [preview, setPreview] = useState<main.TripPreview | null>(null)
     const [written, setWritten] = useState<string[] | null>(null)
     const [error, setError] = useState('')
     const [busy, setBusy] = useState(false)
     const [open, setOpen] = useState<number | null>(null)
+    const [progress, setProgress] = useState('')
 
-    const request = (output = outputDir) =>
-        main.TripRequest.createFrom({tripPath, hotspotDir, outputDir: output})
+    useEffect(() => EventsOn('hotspot-progress', (message: string) => setProgress(message)), [])
+
+    const request = () => main.TripRequest.createFrom({tripPath})
 
     function reset() {
         setPreview(null)
@@ -41,14 +40,6 @@ export default function App() {
         const path = await ChooseTripFile()
         if (!path) return
         setTripPath(path)
-        setOutputDir(await DefaultOutputDir(path))
-        reset()
-    }
-
-    async function pickFolder(title: string, set: (path: string) => void) {
-        const path = await ChooseFolder(title)
-        if (!path) return
-        set(path)
         reset()
     }
 
@@ -61,6 +52,7 @@ export default function App() {
             setError(errorText(err))
         } finally {
             setBusy(false)
+            setProgress('')
         }
     }
 
@@ -78,7 +70,7 @@ export default function App() {
         if (paths) setWritten(paths)
     }
 
-    const ready = tripPath !== '' && hotspotDir !== ''
+    const ready = tripPath !== ''
     const totalSpecies = preview?.quizzes.reduce((sum, q) => sum + q.quiz.species.length, 0) ?? 0
 
     return (
@@ -110,22 +102,16 @@ export default function App() {
                     </div>
                     <div className="step-row">
                         <span className="step-label">2. HOTSPOT DATA</span>
-                        <span className={hotspotDir ? 'step-value' : 'step-value placeholder'} title={hotspotDir}>
-                            {hotspotDir || 'No folder chosen'}
-                            <span className="step-hint">Folder of L12345.json files, e.g. the legacy .cache/hotspots.</span>
+                        <span className="step-value">
+                            Downloaded from eBird and cached
+                            <span className="step-hint">Bar chart data per hotspot, refreshed after six months.</span>
                         </span>
-                        <button className="secondary-button" disabled={busy}
-                                onClick={() => pickFolder('Choose hotspot data folder', setHotspotDir)}>Choose…
-                        </button>
+                        <span/>
                     </div>
                     <div className="step-row">
                         <span className="step-label">3. OUTPUT FOLDER</span>
-                        <span className={outputDir ? 'step-value' : 'step-value placeholder'} title={outputDir}>
-                            {outputDir || 'Defaults to generated_quizzes beside the trip file'}
-                        </span>
-                        <button className="secondary-button" disabled={busy}
-                                onClick={() => pickFolder('Choose output folder', setOutputDir)}>Choose…
-                        </button>
+                        <span className="step-value">Fixed for now: build/temp in this project</span>
+                        <span/>
                     </div>
                 </div>
 
@@ -140,6 +126,7 @@ export default function App() {
                     )}
                 </div>
 
+                {busy && progress && <div className="message notice" role="status">{progress}</div>}
                 {error && <div className="message error" role="alert">{error}</div>}
                 {written && (
                     <div className="message success" role="status">

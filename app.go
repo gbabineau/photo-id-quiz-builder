@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gbabineau/photo-id-quiz-builder/internal/hotspot"
 	"github.com/gbabineau/photo-id-quiz-builder/internal/taxonomy"
 	"github.com/gbabineau/photo-id-quiz-builder/internal/trip"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -23,9 +24,8 @@ func (a *App) startup(ctx context.Context) { a.ctx = ctx }
 
 // TripRequest describes one trip-to-quizzes run.
 type TripRequest struct {
-	TripPath   string `json:"tripPath"`
-	HotspotDir string `json:"hotspotDir"`
-	OutputDir  string `json:"outputDir"`
+	TripPath  string `json:"tripPath"`
+	OutputDir string `json:"outputDir"`
 }
 
 // TripPreview is what the UI shows before anything is written.
@@ -61,8 +61,15 @@ func defaultOutputDir(tripPath string) string {
 	return filepath.Join(filepath.Dir(tripPath), "generated_quizzes")
 }
 
+// Temporary fixed output folder until a folder picker returns.
+const hardcodedOutputDir = `C:\Users\Guy\GitProjects\photo-id-quiz-builder\build\temp`
+
+// ProgressEvent is emitted while hotspot data is loaded.
+const ProgressEvent = "hotspot-progress"
+
 // PreviewTrip builds the per-day quizzes without writing files.
 func (a *App) PreviewTrip(req TripRequest) (TripPreview, error) {
+	req.OutputDir = hardcodedOutputDir
 	ctx := a.ctx
 	if ctx == nil {
 		ctx = context.Background()
@@ -71,24 +78,30 @@ func (a *App) PreviewTrip(req TripRequest) (TripPreview, error) {
 	if err != nil {
 		return TripPreview{}, err
 	}
-	return previewTrip(req, taxa)
+	cacheDir, err := os.UserCacheDir()
+	if err != nil {
+		return TripPreview{}, fmt.Errorf("find user cache directory: %w", err)
+	}
+	src := hotspot.NewSource(ctx, filepath.Join(cacheDir, "photo-id-quiz-builder", "hotspots"), a.progress)
+	defer src.Close()
+	return previewTrip(req, taxa, src)
 }
 
-func previewTrip(req TripRequest, taxa []taxonomy.Taxon) (TripPreview, error) {
+func (a *App) progress(message string) {
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, ProgressEvent, message)
+	}
+}
+
+func previewTrip(req TripRequest, taxa []taxonomy.Taxon, src trip.HotspotSource) (TripPreview, error) {
 	if req.TripPath == "" {
 		return TripPreview{}, errors.New("choose a trip JSON file")
-	}
-	if req.HotspotDir == "" {
-		return TripPreview{}, errors.New("choose the folder with hotspot species data")
-	}
-	if info, err := os.Stat(req.HotspotDir); err != nil || !info.IsDir() {
-		return TripPreview{}, fmt.Errorf("hotspot data folder not found: %s", req.HotspotDir)
 	}
 	t, err := trip.ReadTrip(req.TripPath)
 	if err != nil {
 		return TripPreview{}, err
 	}
-	result := trip.Build(t, trip.DirSource{Dir: req.HotspotDir}, taxa)
+	result := trip.Build(t, src, taxa)
 	output := req.OutputDir
 	if output == "" {
 		output = defaultOutputDir(req.TripPath)

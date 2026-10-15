@@ -4,7 +4,7 @@ A desktop companion to the [Photo ID quiz runner](https://github.com/gbabineau/p
 
 ## First slice: trip JSON to daily quizzes
 
-Port of `photo_id/process_trip.py` from the legacy Python/Tkinter project. Given a trip file and a folder of hotspot species data, it writes one runner-compatible quiz per itinerary day:
+Port of `photo_id/process_trip.py` from the legacy Python/Tkinter project. Given a trip file, it downloads (and caches) each hotspot's species frequencies and writes one runner-compatible quiz per itinerary day:
 
 1. Average each species' frequency across the day's hotspots (only rows at or above `minimum_frequency`).
 2. Add species listed in the day's `mentioned` array, marked `"Mentioned in trip data"`.
@@ -12,29 +12,29 @@ Port of `photo_id/process_trip.py` from the legacy Python/Tkinter project. Given
 4. Drop species under 1%, sort taxonomically.
 5. Keep each species only on the day where it is best placed: a day that mentions it wins, otherwise the higher frequency, otherwise the earlier day.
 
-Output files are named `Day N with M species.json` in `generated_quizzes` beside the trip file, unless you pick another folder. Quiz JSON uses `start_month`, `end_month`, `location`, `notes`, and `species` entries with `comName` plus optional `frequency`, `notes`, `speciesCode`, `sciName`, and taxonomy fields. Legacy uppercase `Notes` is read, and the first entry wins for duplicate common names.
+Output files are named `Day N with species 1-M.json`. A day with more than 40 species is split into the fewest balanced parts of at most 30 (`Day N with species 1-23.json`, `Day N with species 24-45.json`). For now they are written to `build/temp` in this project. Quiz JSON uses `start_month`, `end_month`, `location`, `notes`, and `species` entries with `comName` plus optional `frequency`, `notes`, `speciesCode`, `sciName`, and taxonomy fields. Legacy uppercase `Notes` is read, and the first entry wins for duplicate common names.
 
 ### Inputs
 
 - **Trip file**: JSON with `name`, `location`, `start_month`, `end_month`, `minimum_frequency`, and an `itinerary` of days (`day`, `Full day title` or `AM_title`/`PM_title`, `hotspots` with `hotspotId`, `mentioned`). Hotspot IDs may be `L485324` or an eBird hotspot URL.
-- **Hotspot data folder**: files named `<hotspotId>.json` holding `[{"comName": "...", "frequency": 12.5}]`. This is the legacy `.cache/hotspots` layout. Missing hotspots produce a warning rather than a failure.
+- **Hotspot data**: downloaded from each hotspot's public eBird bar chart (no eBird login) and cached per hotspot under the user cache folder (`photo-id-quiz-builder/hotspots`) for 180 days. Weekly frequencies are combined over the trip's month range (wrapping past December), weighted by checklist counts. Spuhs, slashes, hybrids and forms are skipped. A hotspot that cannot be fetched produces a warning rather than a failure, and stale cache is used if a refresh fails.
 - **Taxonomy**: see below.
 
-Fetching hotspot data live from eBird was done in the legacy tool by scripting a browser login with a personal eBird username and password. That is deliberately not ported here; reuse the legacy cache or another source for now.
+eBird protects its pages with Anubis proof-of-work, so downloads run through headless Chromium (Playwright), as in the runner. The first download installs Chromium. Frequencies come from the bar chart, so unlike the legacy "targets" page they do not depend on your life list.
 
 ## Credentials and configuration
 
 No credentials are stored in the repository or entered in the UI. The taxonomy is resolved in this order:
 
 1. `EBIRD_TAXONOMY_PATH`: path to a taxonomy JSON file.
-2. The user cache file `photo-id-quiz-builder/taxonomy.json` (under the OS user cache directory).
-3. Download from the eBird API using the `EBIRDAPIKEY` environment variable, then cache it.
+2. The user cache file `photo-id-quiz-builder/taxonomy.json` (under the OS user cache directory). eBird publishes a new taxonomy in late October, so a cached copy is reused until Oct 25; a copy downloaded during Oct 25-31 is replaced once from Nov 1.
+3. Download from the eBird API using the `EBIRDAPIKEY` environment variable, then cache it. Rate-limit responses (429) are retried after the time eBird asks for.
 
-Set the variable in your shell before launching, for example `$env:EBIRDAPIKEY = "..."` in PowerShell. Request a key from your eBird account.
+Set the variable in your shell before launching, for example `$env:EBIRDAPIKEY = "..."` in PowerShell. Request a key from your eBird account. Set `PHOTO_ID_DEBUG=1` to log retries and delays.
 
 ### GitHub Actions secrets
 
-The current workflow (`.github/workflows/quality.yml`) needs none: unit tests use fakes and a local HTTP server. If a live eBird test is added later, store the key as the repository secret `EBIRDAPIKEY` and expose it only to that step.
+The current workflow (`.github/workflows/quality.yml`) needs none: unit tests use fakes and a local HTTP server, and nothing launches a browser. If a live eBird test is added later, store the key as the repository secret `EBIRDAPIKEY` and expose it only to that step.
 
 ## Development
 

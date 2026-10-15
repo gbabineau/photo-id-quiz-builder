@@ -38,7 +38,6 @@ export namespace main {
 	}
 	export class TripRequest {
 	    tripPath: string;
-	    hotspotDir: string;
 	    outputDir: string;
 	
 	    static createFrom(source: any = {}) {
@@ -48,7 +47,6 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.tripPath = source["tripPath"];
-	        this.hotspotDir = source["hotspotDir"];
 	        this.outputDir = source["outputDir"];
 	    }
 	}

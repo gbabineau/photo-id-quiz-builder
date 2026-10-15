@@ -2,6 +2,8 @@ package main
 
 import (
 	"embed"
+	"log/slog"
+	"os"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -12,6 +14,9 @@ import (
 var assets embed.FS
 
 func main() {
+	if os.Getenv("PHOTO_ID_DEBUG") != "" {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	}
 	app := NewApp()
 
 	err := wails.Run(&options.App{

@@ -25,6 +25,9 @@ const (
 	MentionedNote = "Mentioned in trip data"
 	// minimumKeptFrequency is the percent below which a species is dropped, as in the legacy tool.
 	minimumKeptFrequency = 1.0
+	// Quizzes with more than splitThreshold species are split into parts of at most maxPartSize.
+	splitThreshold = 40
+	maxPartSize    = 30
 )
 
 // FlexString decodes either a JSON string or number into a string (legacy "day" values vary).
@@ -96,15 +99,17 @@ type HotspotSpecies struct {
 // ErrNoHotspotData means the source has no data for the hotspot.
 var ErrNoHotspotData = errors.New("no hotspot data")
 
-// HotspotSource supplies species frequencies for a hotspot ID such as "L485324".
+// HotspotSource supplies species frequencies (percent of checklists) for a hotspot ID such as
+// "L485324" over the inclusive month range; a start after the end wraps past December.
 type HotspotSource interface {
-	Species(hotspotID string) ([]HotspotSpecies, error)
+	Species(hotspotID string, startMonth, endMonth int) ([]HotspotSpecies, error)
 }
 
 // DirSource reads "<dir>/<hotspotID>.json" files, the layout of the legacy .cache/hotspots folder.
+// Those files are not month-specific, so the month range is ignored.
 type DirSource struct{ Dir string }
 
-func (d DirSource) Species(hotspotID string) ([]HotspotSpecies, error) {
+func (d DirSource) Species(hotspotID string, _, _ int) ([]HotspotSpecies, error) {
 	data, err := os.ReadFile(filepath.Join(d.Dir, hotspotID+".json"))
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, ErrNoHotspotData
@@ -152,7 +157,7 @@ func Build(t Trip, src HotspotSource, taxa []taxonomy.Taxon) Result {
 
 	for i, day := range t.Itinerary {
 		label := dayLabel(day, i)
-		species := hotspotSpecies(day, t.MinimumFrequency, src, missing, &result.Warnings, label)
+		species := hotspotSpecies(day, t, src, missing, &result.Warnings, label)
 		species = addMentions(species, day.Mentioned, lookup, &result.Warnings, label)
 		for k := range species {
 			attachTaxonomy(&species[k], lookup)
@@ -173,11 +178,26 @@ func Build(t Trip, src HotspotSource, taxa []taxonomy.Taxon) Result {
 			Species:    days[i],
 		}
 		label := dayLabel(day, i)
-		result.Quizzes = append(result.Quizzes, DayQuiz{
-			Day:      label,
-			FileName: uniqueName(fmt.Sprintf("Day %s with %d species.json", sanitize(label), len(q.Species)), used),
-			Quiz:     q,
-		})
+		baseName := fmt.Sprintf("Day %s with species", sanitize(label))
+		parts := quiz.Split(q, splitThreshold, maxPartSize)
+		if len(parts) == 1 {
+			name := fmt.Sprintf("%s 1-%d.json", baseName, len(q.Species))
+			if len(q.Species) == 0 {
+				name = fmt.Sprintf("Day %s with no species.json", sanitize(label))
+			}
+			result.Quizzes = append(result.Quizzes, DayQuiz{Day: label, FileName: uniqueName(name, used), Quiz: q})
+			continue
+		}
+		first := 1
+		for n, part := range parts {
+			last := first + len(part.Species) - 1
+			result.Quizzes = append(result.Quizzes, DayQuiz{
+				Day:      fmt.Sprintf("%s (%d/%d)", label, n+1, len(parts)),
+				FileName: uniqueName(fmt.Sprintf("%s %d-%d.json", baseName, first, last), used),
+				Quiz:     part,
+			})
+			first = last + 1
+		}
 	}
 	return result
 }
@@ -218,7 +238,7 @@ func uniqueName(name string, used map[string]bool) string {
 }
 
 // hotspotSpecies averages, per species, the frequencies from hotspots that meet the minimum.
-func hotspotSpecies(day Day, minFreq float64, src HotspotSource, missing map[string]bool, warnings *[]string, label string) []quiz.Species {
+func hotspotSpecies(day Day, t Trip, src HotspotSource, missing map[string]bool, warnings *[]string, label string) []quiz.Species {
 	type acc struct {
 		sum   float64
 		count int
@@ -229,7 +249,7 @@ func hotspotSpecies(day Day, minFreq float64, src HotspotSource, missing map[str
 
 	for _, h := range day.Hotspots {
 		id := HotspotID(h.HotspotID)
-		list, err := src.Species(id)
+		list, err := src.Species(id, orDefault(t.StartMonth, 1), orDefault(t.EndMonth, 12))
 		if err != nil {
 			if !missing[id] {
 				missing[id] = true
@@ -238,7 +258,7 @@ func hotspotSpecies(day Day, minFreq float64, src HotspotSource, missing map[str
 			continue
 		}
 		for _, s := range list {
-			if s.Frequency < minFreq {
+			if s.Frequency < t.MinimumFrequency {
 				continue
 			}
 			key := nameKey(s.CommonName)

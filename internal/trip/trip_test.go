@@ -2,6 +2,7 @@ package trip
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,7 +13,7 @@ import (
 
 type mapSource map[string][]HotspotSpecies
 
-func (m mapSource) Species(id string) ([]HotspotSpecies, error) {
+func (m mapSource) Species(id string, _, _ int) ([]HotspotSpecies, error) {
 	list, ok := m[id]
 	if !ok {
 		return nil, ErrNoHotspotData
@@ -150,7 +151,7 @@ func TestMissingHotspotDataWarnsOnce(t *testing.T) {
 	if len(res.Warnings) != 1 {
 		t.Fatalf("warnings = %v", res.Warnings)
 	}
-	if res.Quizzes[0].FileName != "Day 1 with 0 species.json" {
+	if res.Quizzes[0].FileName != "Day 1 with no species.json" {
 		t.Errorf("file name = %q", res.Quizzes[0].FileName)
 	}
 }
@@ -159,7 +160,7 @@ func TestFileNamesAreSafeAndUnique(t *testing.T) {
 	tr := Trip{Itinerary: []Day{{Day: "2/3"}, {Day: "2/3"}, {}}}
 	res := Build(tr, mapSource{}, testTaxa)
 	got := []string{res.Quizzes[0].FileName, res.Quizzes[1].FileName, res.Quizzes[2].FileName}
-	want := []string{"Day 2-3 with 0 species.json", "Day 2-3 with 0 species (2).json", "Day 3 with 0 species.json"}
+	want := []string{"Day 2-3 with no species.json", "Day 2-3 with no species (2).json", "Day 3 with no species.json"}
 	if !equal(got, want) {
 		t.Fatalf("got %v want %v", got, want)
 	}
@@ -196,11 +197,11 @@ func TestDirSource(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "L1.json"), []byte(`[{"comName":"Alpha Bird","frequency":12.5}]`), 0o644)
 	src := DirSource{Dir: dir}
-	list, err := src.Species("L1")
+	list, err := src.Species("L1", 1, 12)
 	if err != nil || len(list) != 1 || list[0].Frequency != 12.5 {
 		t.Fatalf("list=%v err=%v", list, err)
 	}
-	if _, err := src.Species("L2"); !errors.Is(err, ErrNoHotspotData) {
+	if _, err := src.Species("L2", 1, 12); !errors.Is(err, ErrNoHotspotData) {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -221,5 +222,27 @@ func TestWriteAllProducesRunnerReadableFiles(t *testing.T) {
 	}
 	if q.Location != "NO" || len(q.Species) != 1 || q.Species[0].SpeciesCode != "alpbir" {
 		t.Fatalf("quiz = %+v", q)
+	}
+}
+
+func TestLargeDayIsSplitIntoNamedParts(t *testing.T) {
+	var taxa []taxonomy.Taxon
+	var rows []HotspotSpecies
+	for i := 0; i < 45; i++ {
+		name := fmt.Sprintf("Bird %02d", i)
+		taxa = append(taxa, taxonomy.Taxon{CommonName: name, Category: "species", TaxonOrder: float64(i)})
+		rows = append(rows, HotspotSpecies{CommonName: name, Frequency: 50})
+	}
+	tr := Trip{Itinerary: []Day{{Day: "1", Hotspots: []Hotspot{{HotspotID: "L1"}}}}}
+	res := Build(tr, mapSource{"L1": rows}, taxa)
+
+	if len(res.Quizzes) != 2 {
+		t.Fatalf("quizzes = %d", len(res.Quizzes))
+	}
+	if res.Quizzes[0].FileName != "Day 1 with species 1-23.json" || res.Quizzes[1].FileName != "Day 1 with species 24-45.json" {
+		t.Errorf("names = %q, %q", res.Quizzes[0].FileName, res.Quizzes[1].FileName)
+	}
+	if n := len(res.Quizzes[0].Quiz.Species) + len(res.Quizzes[1].Quiz.Species); n != 45 {
+		t.Errorf("species total = %d", n)
 	}
 }
