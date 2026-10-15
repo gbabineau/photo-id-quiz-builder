@@ -410,19 +410,3 @@ func without(species []quiz.Species, drop map[string]bool) []quiz.Species {
 	}
 	return kept
 }
-
-// WriteAll saves every quiz into dir, creating it if needed, and returns the file paths.
-func WriteAll(dir string, quizzes []DayQuiz) ([]string, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, fmt.Errorf("create output folder: %w", err)
-	}
-	paths := make([]string, 0, len(quizzes))
-	for _, q := range quizzes {
-		path := filepath.Join(dir, q.FileName)
-		if err := quiz.Write(path, q.Quiz); err != nil {
-			return paths, err
-		}
-		paths = append(paths, path)
-	}
-	return paths, nil
-}

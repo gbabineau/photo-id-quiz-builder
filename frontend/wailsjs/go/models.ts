@@ -1,5 +1,19 @@
 export namespace main {
 	
+	export class SettingsView {
+	    quizzesDir: string;
+	    quizzesDirFromEnv: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SettingsView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.quizzesDir = source["quizzesDir"];
+	        this.quizzesDirFromEnv = source["quizzesDirFromEnv"];
+	    }
+	}
 	export class TripPreview {
 	    tripName: string;
 	    outputDir: string;
@@ -38,7 +52,6 @@ export namespace main {
 	}
 	export class TripRequest {
 	    tripPath: string;
-	    outputDir: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new TripRequest(source);
@@ -47,7 +60,20 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.tripPath = source["tripPath"];
-	        this.outputDir = source["outputDir"];
+	    }
+	}
+	export class WriteResult {
+	    written: string[];
+	    cancelled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new WriteResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.written = source["written"];
+	        this.cancelled = source["cancelled"];
 	    }
 	}
 

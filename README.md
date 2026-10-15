@@ -12,7 +12,7 @@ Port of `photo_id/process_trip.py` from the legacy Python/Tkinter project. Given
 4. Drop species under 1%, sort taxonomically.
 5. Keep each species only on the day where it is best placed: a day that mentions it wins, otherwise the higher frequency, otherwise the earlier day.
 
-Output files are named `Day N with species 1-M.json`. A day with more than 40 species is split into the fewest balanced parts of at most 30 (`Day N with species 1-23.json`, `Day N with species 24-45.json`). For now they are written to `build/temp` in this project. Quiz JSON uses `start_month`, `end_month`, `location`, `notes`, and `species` entries with `comName` plus optional `frequency`, `notes`, `speciesCode`, `sciName`, and taxonomy fields. Legacy uppercase `Notes` is read, and the first entry wins for duplicate common names.
+Output files are named `Day N with species 1-M.json`. A day with more than 40 species is split into the fewest balanced parts of at most 30 (`Day N with species 1-23.json`, `Day N with species 24-45.json`). Each trip's quizzes go in their own folder, named after the trip's `name` (the file name is used if it has none), inside the shared quizzes folder (see "Where files live"). Quiz JSON uses `start_month`, `end_month`, `location`, `notes`, and `species` entries with `comName` plus optional `frequency`, `notes`, `speciesCode`, `sciName`, and taxonomy fields. Legacy uppercase `Notes` is read, and the first entry wins for duplicate common names.
 
 ### Inputs
 
@@ -21,6 +21,12 @@ Output files are named `Day N with species 1-M.json`. A day with more than 40 sp
 - **Taxonomy**: see below.
 
 eBird protects its pages with Anubis proof-of-work, so downloads run through headless Chromium (Playwright), as in the runner. The first download installs Chromium. Frequencies come from the bar chart, so unlike the legacy "targets" page they do not depend on your life list.
+
+## Where files live
+
+- **Trip files** are source, kept in their own repository outside this app. The file picker starts in the folder of the last trip you opened.
+- **Quizzes** are written to `Documents\Photo ID\Quizzes\<trip name>\`, a folder both the builder and the runner can use. Change it with the Choose button, or set `PHOTO_ID_QUIZZES_DIR` (which takes precedence). Rebuilding a trip replaces its previous quizzes, including parts that are no longer needed, after you confirm in a dialog; the builder tracks what it wrote in a hidden `.quiz-builder.json` in the trip folder and never deletes other files.
+- **Settings** are saved in `settings.json` under the user config folder (`photo-id-quiz-builder`). **Caches** (taxonomy, hotspot data) live under the user cache folder and can be deleted freely.
 
 ## Credentials and configuration
 
